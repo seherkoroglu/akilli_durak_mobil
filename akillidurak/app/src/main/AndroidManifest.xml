@@ -43,10 +43,10 @@
         <activity
             android:name=".DurakActivity"
             android:exported="true" />
+
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyAQoaDql1WC5DS2yu7LDum_sm_5vDyHhx4" />
-
+            android:value="${MAPS_API_KEY}" />
 
 
 
