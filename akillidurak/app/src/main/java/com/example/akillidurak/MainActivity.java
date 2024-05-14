@@ -9,6 +9,7 @@ import android.location.Criteria;
 import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.speech.RecognizerIntent;
@@ -19,7 +20,7 @@ import android.widget.Toast;
 
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -31,11 +32,16 @@ import java.util.Locale;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 
+import com.google.android.gms.maps.GoogleMap;
+
+
 public class MainActivity extends AppCompatActivity implements TextToSpeech.OnInitListener{
     private TextToSpeech textToSpeech;
     private double latitude;
     private double longitude;
     private String locationName;
+    private GoogleMap mMap;
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
 
     private static final int REQUEST_LOCATION_PERMISSION = 101;
     private ActivityResultLauncher<Intent> speechInputLauncher;
@@ -96,22 +102,11 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             requestLocationPermission();
         }
 
-        Button buttonNavigate = findViewById(R.id.buttonNavigate);
-        buttonNavigate.setOnClickListener(v -> {
-            if (latitude != 0 && longitude != 0) {
-                Intent intent = new Intent(MainActivity.this, MapActivity.class);
-                intent.putExtra("latitude", latitude);
-                intent.putExtra("longitude", longitude);
-                intent.putExtra("locationName", locationName);
-                startActivity(intent);
-            } else {
-                Toast.makeText(this, "Hedef konum bulunamadı", Toast.LENGTH_SHORT).show();
-            }
-        });
+
+
     }
     public void onInit(int status) {
         if (status == TextToSpeech.SUCCESS) {
-
             speakWelcomeMessageAndPrompt();
 
         }
@@ -122,25 +117,23 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             requestLocationPermission();
             return;
         }
-
         speakWelcomeMessageAndPrompt();
     }
 
     private void speakWelcomeMessageAndPrompt() {
-        String welcomeMessage = "Hoş geldiniz. Hedef konumu söyleyin lütfen...";
+        String welcomeMessage = "Welcome, can you tell in a few words where you want to go?";
         textToSpeech.setLanguage(Locale.getDefault());
         textToSpeech.speak(welcomeMessage, TextToSpeech.QUEUE_FLUSH, null, "welcome");
         listenForSpeechInput();
     }
 
+
+
     private void listenForSpeechInput() {
-        speechTimeoutHandler.postDelayed(() -> {
-            if (!speechInputReceived) {
-                speakPromptAgain();
-            }
-        }, SPEECH_TIMEOUT_MILLISECONDS);
 
         new Handler().postDelayed(() -> {
+
+
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
@@ -152,22 +145,31 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             }
         }, SPEECH_TIMEOUT_MILLISECONDS);
     }
-    private static final int PROMPT_DELAY_MILLISECONDS = 6000; // 6 saniye bekletme süresi
 
-    private void speakPromptAgain() {
-        new Handler().postDelayed(() -> {
-        String promptAgainMessage = "Hedef konumu söylemediğiniz için tekrar soruyorum...";
-        textToSpeech.setLanguage(Locale.getDefault());
-        textToSpeech.speak(promptAgainMessage, TextToSpeech.QUEUE_FLUSH, null, "promptAgain");
-
-
-
-            listenForSpeechInput();
-        }, PROMPT_DELAY_MILLISECONDS);
-    }
 
 
     // Hedef konumu bul
+    private void navigateToMapActivityWithRoute() {
+        if (latitude != 0 && longitude != 0 && locationName != null) {
+
+            Uri uri = Uri.parse("https://www.google.com/maps/dir/" + latitude + "," + longitude + "/" + locationName);
+            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+            intent.setPackage("com.google.android.apps.maps");
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } else {
+            String targetMessage = "Target location not found";
+            textToSpeech.setLanguage(Locale.getDefault());
+            textToSpeech.speak(targetMessage, TextToSpeech.QUEUE_FLUSH, null, "Target");
+        }
+    }
+
+    private void speakRouteCreatedMessage() {
+        String routeMessage = "Route Created";
+        textToSpeech.setLanguage(Locale.getDefault());
+        textToSpeech.speak(routeMessage, TextToSpeech.QUEUE_FLUSH, null, "routeCreated");
+    }
+
     private void findDestination(String locationName) {
         Geocoder geocoder = new Geocoder(this, Locale.getDefault());
         try {
@@ -177,32 +179,35 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                 latitude = address.getLatitude();
                 longitude = address.getLongitude();
                 this.locationName = address.getAddressLine(0);
-                // Diğer sayfaya yönlendir
-                navigateToMapActivity();
+                speakRouteCreatedMessage(); // Route oluşturulduğunda bu mesajı söyle
+                startMapActivityWithDestination(); // Start MapActivity with destination coordinates
             } else {
-                String promptAgainMessage = "Geçersiz konum, lütfen başka bir konum söyleyin";
+                String error = "Location not found"; // Konum bulunamadığında hata mesajı güncellendi
                 textToSpeech.setLanguage(Locale.getDefault());
-                textToSpeech.speak(promptAgainMessage, TextToSpeech.QUEUE_FLUSH, null, "promptAgain");
+                textToSpeech.speak(error, TextToSpeech.QUEUE_FLUSH, null, "error");
             }
         } catch (IOException e) {
-            String promptAgainMessage = "Konum Dönüştürme Hatası";
+            String error = "Location conversion error";
             textToSpeech.setLanguage(Locale.getDefault());
-            textToSpeech.speak(promptAgainMessage, TextToSpeech.QUEUE_FLUSH, null, "promptAgain");
+            textToSpeech.speak(error, TextToSpeech.QUEUE_FLUSH, null, "error");
         }
     }
 
-    // Diğer sayfaya yönlendir
-    private void navigateToMapActivity() {
-        if (latitude != 0 && longitude != 0) {
-            Intent intent = new Intent(MainActivity.this, MapActivity.class);
+    private void startMapActivityWithDestination() {
+        if (latitude != 0 && longitude != 0 && locationName != null) {
+            Intent intent = new Intent(this, MapActivity.class);
             intent.putExtra("latitude", latitude);
             intent.putExtra("longitude", longitude);
             intent.putExtra("locationName", locationName);
             startActivity(intent);
         } else {
-            Toast.makeText(this, "Hedef konum bulunamadı", Toast.LENGTH_SHORT).show();
+            String targetMessage = "Target location not found";
+            textToSpeech.setLanguage(Locale.getDefault());
+            textToSpeech.speak(targetMessage, TextToSpeech.QUEUE_FLUSH, null, "Target");
         }
     }
+
+
 
     private void requestLocationPermission() {
         ActivityCompat.requestPermissions(this,
@@ -234,8 +239,5 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             speechTimeoutHandler.removeCallbacksAndMessages(null);
         }
     }
-    }
 
-
-
-
+}
