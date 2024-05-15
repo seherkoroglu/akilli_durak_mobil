@@ -1,15 +1,16 @@
 package com.example.akillidurak;
 
 import android.os.Bundle;
+import android.widget.EditText;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MarkerOptions;
 
 public class DurakActivity extends AppCompatActivity implements OnMapReadyCallback {
     private GoogleMap mMap;
@@ -20,6 +21,8 @@ public class DurakActivity extends AppCompatActivity implements OnMapReadyCallba
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_durak);
+
+
 
         latitude = getIntent().getDoubleExtra("latitude", 0.0);
         longitude = getIntent().getDoubleExtra("longitude", 0.0);
@@ -32,27 +35,17 @@ public class DurakActivity extends AppCompatActivity implements OnMapReadyCallba
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
-        // En yakın durağı bul ve zoom yap
-        LatLng nearestStop = findNearestStop(latitude, longitude);
-        if (nearestStop != null) {
-            float zoomLevel = 16.0f; // Or desired zoom level
-            CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(nearestStop, zoomLevel);
-            mMap.moveCamera(cameraUpdate);
+        // Hedef konumu işaretle
+        LatLng destinationLatLng = new LatLng(latitude, longitude);
+        mMap.addMarker(new MarkerOptions().position(destinationLatLng).title("Destination"));
 
-            // Sesli bir şekilde yol tarifi yap
-            String directions = "En yakın durağa yönlendiriliyorsunuz.";
-            // Sesli yönlendirme kodu buraya gelecek
-            speakDirections(directions);
-        }
+        // Haritayı hedef konuma odakla
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(destinationLatLng, 15));
     }
-
     private LatLng findNearestStop(double latitude, double longitude) {
-        // En yakın durağı bulmak için gerekli hesaplamalar
-
+        // Burada en yakın durağı bulmak için gerekli hesaplamaları yapabilirsiniz
+        // Örneğin, sabit bir durağın koordinatlarını kullanabiliriz
         return new LatLng(40.7128, -74.0060); // Örnek bir durağın koordinatları
     }
 
-    private void speakDirections(String directions) {
-        // Sesli yönlendirme için gerekli kod buraya gelecek
-    }
 }

@@ -10,7 +10,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
 
 
@@ -35,13 +35,7 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".MapActivity"
-            android:exported="true" >
 
-        <!-- API anahtarları için meta-data öğeleri -->
-
-        </activity>
 
 
 

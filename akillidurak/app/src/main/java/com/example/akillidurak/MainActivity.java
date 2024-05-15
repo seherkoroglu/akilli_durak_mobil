@@ -1,4 +1,5 @@
 package com.example.akillidurak;
+
 import android.Manifest;
 
 import android.content.Context;
@@ -14,7 +15,12 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.util.Log;
+import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -29,13 +35,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 
 import com.google.android.gms.maps.GoogleMap;
 
 
-public class MainActivity extends AppCompatActivity implements TextToSpeech.OnInitListener{
+public class MainActivity extends AppCompatActivity implements TextToSpeech.OnInitListener {
     private TextToSpeech textToSpeech;
     private double latitude;
     private double longitude;
@@ -46,174 +53,74 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     private static final int REQUEST_LOCATION_PERMISSION = 101;
     private ActivityResultLauncher<Intent> speechInputLauncher;
     private boolean locationPermissionGranted = false;
-    private static final int SPEECH_TIMEOUT_MILLISECONDS = 5000;
+    private static final int SPEECH_TIMEOUT_MILLISECONDS = 10000;
     private Handler speechTimeoutHandler;
     private boolean speechInputReceived = false;
+    private LocationManager locationManager;
+    private String provider;
+
+
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         textToSpeech = new TextToSpeech(this, this);
 
+        // ActivityResultLauncher başlatılıyor
         speechInputLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
                 result -> {
-                    speechInputReceived = true; // Ses girişi alındı
-                    speechTimeoutHandler.removeCallbacksAndMessages(null); // Timeout işlemi iptal edilir
-                    Intent data = result.getData();
-                    if (result.getResultCode() == RESULT_OK && data != null) {
-                        ArrayList<String> speechResults = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-                        if (speechResults != null && !speechResults.isEmpty()) {
-                            String input = speechResults.get(0);
-                            if (locationPermissionGranted) {
-                                findDestination(input);
-                            } else {
-                                requestLocationPermission();
-                            }
+                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                        List<String> matches = result.getData().getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                        if (matches != null && !matches.isEmpty()) {
+                            String destination = matches.get(0); // İlk eşleşmeyi al
+                            EditText editTextDestination = findViewById(R.id.destination);
+                            editTextDestination.setText(destination);
+                            createRouteAndOpenMaps(); // Hedef belirlendiğinde haritayı aç
                         }
                     }
                 });
+        // Haritayı otomatik açmak için EditText üzerinde değişiklik dinleyicisi ekleniyor
+        EditText editTextDestination = findViewById(R.id.destination);
+        editTextDestination.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
 
-        speechTimeoutHandler = new Handler();
-
-        speechInputLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    Intent data = result.getData();
-                    if (result.getResultCode() == RESULT_OK && data != null) {
-                        ArrayList<String> speechResults = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-                        if (speechResults != null && !speechResults.isEmpty()) {
-                            String input = speechResults.get(0);
-                            if (locationPermissionGranted) {
-                                findDestination(input);
-                            } else {
-                                requestLocationPermission();
-                            }
-                        }
-                    }
-                });
-
-        findViewById(R.id.buttonVoiceInput).setOnClickListener(v -> getDestinationFromVoice());
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            locationPermissionGranted = true;
-        } else {
-            requestLocationPermission();
-        }
-
-
-
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (!s.toString().isEmpty()) {
+                    createRouteAndOpenMaps(); // Hedef belirlendiğinde haritayı aç
+                }
+            }
+        });
     }
-    public void onInit(int status) {
-        if (status == TextToSpeech.SUCCESS) {
-            speakWelcomeMessageAndPrompt();
-
-        }
-    }
-
-    private void getDestinationFromVoice() {
-        if (!locationPermissionGranted) {
-            requestLocationPermission();
-            return;
-        }
-        speakWelcomeMessageAndPrompt();
-    }
-
-    private void speakWelcomeMessageAndPrompt() {
-        String welcomeMessage = "Welcome, can you tell in a few words where you want to go?";
-        textToSpeech.setLanguage(Locale.getDefault());
-        textToSpeech.speak(welcomeMessage, TextToSpeech.QUEUE_FLUSH, null, "welcome");
-        listenForSpeechInput();
-    }
-
 
 
     private void listenForSpeechInput() {
-
         new Handler().postDelayed(() -> {
-
-
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
-
             try {
                 speechInputLauncher.launch(intent);
             } catch (Exception e) {
-
+                e.printStackTrace();
             }
         }, SPEECH_TIMEOUT_MILLISECONDS);
-    }
-
-
-
-    // Hedef konumu bul
-    private void navigateToMapActivityWithRoute() {
-        if (latitude != 0 && longitude != 0 && locationName != null) {
-
-            Uri uri = Uri.parse("https://www.google.com/maps/dir/" + latitude + "," + longitude + "/" + locationName);
-            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-            intent.setPackage("com.google.android.apps.maps");
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent);
-        } else {
-            String targetMessage = "Target location not found";
-            textToSpeech.setLanguage(Locale.getDefault());
-            textToSpeech.speak(targetMessage, TextToSpeech.QUEUE_FLUSH, null, "Target");
-        }
     }
 
     private void speakRouteCreatedMessage() {
         String routeMessage = "Route Created";
         textToSpeech.setLanguage(Locale.getDefault());
-        textToSpeech.speak(routeMessage, TextToSpeech.QUEUE_FLUSH, null, "routeCreated");
-    }
-
-    private void findDestination(String locationName) {
-        Geocoder geocoder = new Geocoder(this, Locale.getDefault());
-        try {
-            List<Address> addresses = geocoder.getFromLocationName(locationName, 1);
-            if (addresses != null && !addresses.isEmpty()) {
-                Address address = addresses.get(0);
-                latitude = address.getLatitude();
-                longitude = address.getLongitude();
-                this.locationName = address.getAddressLine(0);
-                speakRouteCreatedMessage(); // Route oluşturulduğunda bu mesajı söyle
-                startMapActivityWithDestination(); // Start MapActivity with destination coordinates
-            } else {
-                String error = "Location not found"; // Konum bulunamadığında hata mesajı güncellendi
-                textToSpeech.setLanguage(Locale.getDefault());
-                textToSpeech.speak(error, TextToSpeech.QUEUE_FLUSH, null, "error");
-            }
-        } catch (IOException e) {
-            String error = "Location conversion error";
-            textToSpeech.setLanguage(Locale.getDefault());
-            textToSpeech.speak(error, TextToSpeech.QUEUE_FLUSH, null, "error");
-        }
-    }
-
-    private void startMapActivityWithDestination() {
-        if (latitude != 0 && longitude != 0 && locationName != null) {
-            Intent intent = new Intent(this, MapActivity.class);
-            intent.putExtra("latitude", latitude);
-            intent.putExtra("longitude", longitude);
-            intent.putExtra("locationName", locationName);
-            startActivity(intent);
-        } else {
-            String targetMessage = "Target location not found";
-            textToSpeech.setLanguage(Locale.getDefault());
-            textToSpeech.speak(targetMessage, TextToSpeech.QUEUE_FLUSH, null, "Target");
-        }
+        textToSpeech.speak(routeMessage, TextToSpeech.QUEUE_ADD, null, "routeCreated");
     }
 
 
-
-    private void requestLocationPermission() {
-        ActivityCompat.requestPermissions(this,
-                new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                REQUEST_LOCATION_PERMISSION);
-    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -239,5 +146,65 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             speechTimeoutHandler.removeCallbacksAndMessages(null);
         }
     }
+    private void createRouteAndOpenMaps() {
+        EditText editTextSource = findViewById(R.id.source);
+        EditText editTextDestination = findViewById(R.id.destination);
+        String source = editTextSource.getText().toString();
+        String destination = editTextDestination.getText().toString();
 
+        if (!source.isEmpty() && !destination.isEmpty()) {
+            speakRouteCreatedMessage();
+            Uri uri = Uri.parse("https://www.google.com/maps/dir/" + source + "/" + destination);
+            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+            intent.setPackage("com.google.android.apps.maps");
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        }
+    }
+
+
+    @Override
+    public void onInit(int status) {
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        Criteria criteria = new Criteria();
+        provider = locationManager.getBestProvider(criteria, false);
+
+        EditText editTextSource = findViewById(R.id.source);
+
+
+
+        // Kullanıcının bulunduğu konumu otomatik olarak al
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            Location location = locationManager.getLastKnownLocation(provider);
+            if (location != null) {
+                double lat = location.getLatitude();
+                double lng = location.getLongitude();
+                Geocoder geocoder = new Geocoder(MainActivity.this, Locale.getDefault());
+                try {
+                    List<Address> addresses = geocoder.getFromLocation(lat, lng, 1);
+                    if (!addresses.isEmpty()) {
+                        String currentLocation = addresses.get(0).getAddressLine(0);
+                        editTextSource.setText(currentLocation);
+                        // Konumu sesli olarak söyle
+                        String welcome = "Welcome, your current location is " + currentLocation;
+                        textToSpeech.setLanguage(Locale.getDefault());
+                        textToSpeech.speak(welcome, TextToSpeech.QUEUE_FLUSH, null, "welcome");
+                        // Hedef konumu sormak için mesajı sesli olarak söyle
+                        String prompt = "Please tell me your destination";
+                        textToSpeech.speak(prompt, TextToSpeech.QUEUE_ADD, null, "prompt");
+                        // Konuşma girişini beklemek için dinleme işlemini başlat
+                        listenForSpeechInput();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        } else {
+            // Konum izni verilmediyse, izin iste
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
+                    LOCATION_PERMISSION_REQUEST_CODE);
+        }
+
+    }
 }

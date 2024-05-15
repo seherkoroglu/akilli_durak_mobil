@@ -27,6 +27,7 @@ dependencyResolutionManagement {
             authentication.create<BasicAuthentication>("basic")
         }
 
+
     }
 }
 

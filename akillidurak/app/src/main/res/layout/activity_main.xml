@@ -7,31 +7,23 @@
     android:padding="16dp"
     tools:context=".MainActivity">
 
-    <!-- Sesli giriş için mikrofon simgesi -->
-    <ImageButton
-        android:id="@+id/buttonVoiceInput"
-        android:layout_width="130dp"
-        android:layout_height="134dp"
-        android:layout_gravity="center"
-        android:contentDescription="Sesli Giriş"
-        android:src="@drawable/ic_mic" />
-
     <!-- Kullanıcıya yönlendirme bilgilerini göstermek için metin alanı -->
-    <TextView
-        android:id="@+id/textViewDirections"
+    <EditText
+        android:id="@+id/source"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="YÖNLENDİRME: "
+        android:text="Bulunduğunuz Konum: "
         android:textStyle="bold" />
-
-    <Button
-        android:id="@+id/buttonNavigate"
-        android:layout_width="188dp"
+    <EditText
+        android:id="@+id/destination"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:backgroundTint="@color/cardview_dark_background"
-        android:text="Haritada Göster" />
+        android:text="Hedef Konum: "
+        android:textStyle="bold" />
+
+
 
 
 
