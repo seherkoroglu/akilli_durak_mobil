@@ -115,6 +115,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         String routeMessage = "Route Created";
         textToSpeech.setLanguage(Locale.getDefault());
         textToSpeech.speak(routeMessage, TextToSpeech.QUEUE_ADD, null, "routeCreated");
+
+
     }
 
     @Override
@@ -190,7 +192,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                                         float angleDifference = Math.abs(bearingToDestination - bearingToBusStop);
 
                                         // Eğer otobüs durağı hedefe doğruysa, filtrelenmiş listeye ekle
-                                        if (angleDifference < 360 ) { // 90 dereceden küçükse, hedefe doğru olan yöndedir
+                                        if (angleDifference < 360) { // 90 dereceden küçükse, hedefe doğru olan yöndedir
                                             filteredBusStops.add(busStop);
                                         }
                                     }
@@ -221,17 +223,51 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                                         intent.setPackage("com.google.android.apps.maps");
                                         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                                         startActivity(intent);
-                                        speakRouteCreatedMessage();
+                                        onNavigate(nearestBusStop);
+
+
+
                                     } else {
                                         Toast.makeText(MainActivity.this, "Hedef konuma uygun otobüs durağı bulunamadı", Toast.LENGTH_SHORT).show();
                                     }
+
                                 }
+
+                                public void onNavigate(BusStop nearestBusStop) {
+                                    // En yakın otobüs durağının konumunu oluştur
+                                    Location busStopLocation = new Location("");
+                                    busStopLocation.setLatitude(nearestBusStop.getLat());
+                                    busStopLocation.setLongitude(nearestBusStop.getLon());
+
+                                    // Kullanıcının mevcut konumu ile otobüs durağı arasındaki mesafeyi hesapla
+                                    float distanceToBusStop = location.distanceTo(busStopLocation);
+
+
+                                    // Navigasyonu başlat
+                                    Intent intent = new Intent(Intent.ACTION_VIEW,
+                                            Uri.parse("google.navigation:q=" + nearestBusStop.getLat() + "," + nearestBusStop.getLon() + "&mode=w"));
+                                    intent.setPackage("com.google.android.apps.maps");
+                                    if (intent.resolveActivity(getPackageManager()) != null) {
+                                        startActivity(intent);
+
+                                        // Navigasyon başladığında bir mesaj söyle
+                                        if (!speechInputReceived) {
+                                            String navigation = "The nearest bus stop is " + Math.round(distanceToBusStop) + " meters away. Navigation is started, move forward";
+
+                                            textToSpeech.setLanguage(Locale.getDefault());
+                                            textToSpeech.speak(navigation, TextToSpeech.QUEUE_ADD, null, "navigation");
+                                        }
+                                    }
+                                }
+
 
                                 @Override
                                 public void onError(String error) {
                                     Log.e("FindBusStopError", "Error retrieving bus stops: " + error);
                                     Toast.makeText(MainActivity.this, "Hata: " + error, Toast.LENGTH_SHORT).show();
                                 }
+
+
                             });
                         } else {
                             Toast.makeText(MainActivity.this, "Hedef konum bulunamadı", Toast.LENGTH_SHORT).show();
@@ -254,6 +290,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     LOCATION_PERMISSION_REQUEST_CODE);
         }
     }
+
+
 
 
 
