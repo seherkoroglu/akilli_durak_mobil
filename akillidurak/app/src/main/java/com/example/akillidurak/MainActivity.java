@@ -67,6 +67,9 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                             EditText editTextDestination = findViewById(R.id.destination);
                             editTextDestination.setText(destination);
 
+                            // Kullanıcıdan giriş alındı, döngüden çık
+                            speechInputReceived = true;
+
                             // Kullanıcının hedef konumunu findNearestBusStop fonksiyonuna iletmek için gecikmeli çağrı yap
                             Handler handler = new Handler();
                             handler.postDelayed(() -> {
@@ -99,6 +102,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     }
 
     private void listenForSpeechInput() {
+        // Döngü başlatılıyor
         new Handler().postDelayed(() -> {
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
@@ -108,16 +112,10 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             } catch (Exception e) {
                 e.printStackTrace();
             }
+
         }, SPEECH_TIMEOUT_MILLISECONDS);
     }
 
-    private void speakRouteCreatedMessage() {
-        String routeMessage = "Route Created";
-        textToSpeech.setLanguage(Locale.getDefault());
-        textToSpeech.speak(routeMessage, TextToSpeech.QUEUE_ADD, null, "routeCreated");
-
-
-    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -147,142 +145,62 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         // Konum izinlerini kontrol et
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
                 ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            // Konum yöneticisini başlat
-            locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-            if (locationManager != null) {
-                // En iyi sağlayıcıyı al
-                Criteria criteria = new Criteria();
-                provider = locationManager.getBestProvider(criteria, false);
+            // Kullanıcının bulunduğu konumu al
+            LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+            Criteria criteria = new Criteria();
+            String provider = locationManager.getBestProvider(criteria, false);
+            Location userLocation = locationManager.getLastKnownLocation(provider);
 
-                // Son bilinen konumu al
-                Location location = locationManager.getLastKnownLocation(provider);
-                if (location != null) {
-                    // Hedef konumun koordinatlarını almak için Geocoder kullan
-                    Geocoder geocoder = new Geocoder(this, Locale.getDefault());
-                    try {
-                        List<Address> addressList = geocoder.getFromLocationName(destination, 1);
-                        if (addressList != null && addressList.size() > 0) {
-                            double destLat = addressList.get(0).getLatitude();
-                            double destLon = addressList.get(0).getLongitude();
-
-                            // Overpass API kullanarak yakındaki otobüs duraklarını al
-                            OverpassApiHelper.getBusStopsInKocaeli(this, new OverpassApiHelper.BusStopsListener() {
-                                @Override
-                                public void onBusStopsReceived(List<BusStop> busStops) {
-                                    if (busStops.isEmpty()) {
-                                        Toast.makeText(MainActivity.this, "Yakınlarda otobüs durağı bulunamadı", Toast.LENGTH_SHORT).show();
-                                        return;
-                                    }
-
-                                    // Hedef konuma doğru olan otobüs duraklarını filtrele
-                                    List<BusStop> filteredBusStops = new ArrayList<>();
-                                    for (BusStop busStop : busStops) {
-                                        Location busStopLocation = new Location("");
-                                        busStopLocation.setLatitude(busStop.getLat());
-                                        busStopLocation.setLongitude(busStop.getLon());
-
-                                        // Hedef konuma doğru olan yönü kontrol et
-                                        float bearingToDestination = location.bearingTo(new Location("") {{
-                                            setLatitude(destLat);
-                                            setLongitude(destLon);
-                                        }});
-                                        float bearingToBusStop = location.bearingTo(busStopLocation);
-
-                                        // Yön farkını hesapla (mutlak değer alarak)
-                                        float angleDifference = Math.abs(bearingToDestination - bearingToBusStop);
-
-                                        // Eğer otobüs durağı hedefe doğruysa, filtrelenmiş listeye ekle
-                                        if (angleDifference < 360) { // 90 dereceden küçükse, hedefe doğru olan yöndedir
-                                            filteredBusStops.add(busStop);
-                                        }
-                                    }
-
-                                    // En yakın otobüs durağını bul
-                                    BusStop nearestBusStop = null;
-                                    float minDistance = Float.MAX_VALUE;
-                                    for (BusStop busStop : filteredBusStops) {
-                                        Location busStopLocation = new Location("");
-                                        busStopLocation.setLatitude(busStop.getLat());
-                                        busStopLocation.setLongitude(busStop.getLon());
-
-                                        // Kullanıcının mevcut konumu ile otobüs durağı arasındaki mesafeyi hesapla
-                                        float distance = location.distanceTo(busStopLocation);
-
-                                        // Eğer bu mesafe, şu ana kadar en küçük mesafeden daha küçükse, bu otobüs durağını en yakın olarak belirle
-                                        if (distance < minDistance) {
-                                            minDistance = distance;
-                                            nearestBusStop = busStop;
-                                        }
-                                    }
-
-                                    if (nearestBusStop != null) {
-                                        // En yakın otobüs durağına Google Haritalar ile yürüyerek yönlendir
-                                        Uri uri = Uri.parse("https://www.google.com/maps/dir/?api=1&origin=" + location.getLatitude() + "," + location.getLongitude() + "&destination=" + nearestBusStop.getLat() + "," + nearestBusStop.getLon() + "&travelmode=walking");
-
-                                        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-                                        intent.setPackage("com.google.android.apps.maps");
-                                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                        startActivity(intent);
-                                        onNavigate(nearestBusStop);
-
-
-
-                                    } else {
-                                        Toast.makeText(MainActivity.this, "Hedef konuma uygun otobüs durağı bulunamadı", Toast.LENGTH_SHORT).show();
-                                    }
-
-                                }
-
-                                public void onNavigate(BusStop nearestBusStop) {
-                                    // En yakın otobüs durağının konumunu oluştur
-                                    Location busStopLocation = new Location("");
-                                    busStopLocation.setLatitude(nearestBusStop.getLat());
-                                    busStopLocation.setLongitude(nearestBusStop.getLon());
-
-                                    // Kullanıcının mevcut konumu ile otobüs durağı arasındaki mesafeyi hesapla
-                                    float distanceToBusStop = location.distanceTo(busStopLocation);
-
-
-                                    // Navigasyonu başlat
-                                    Intent intent = new Intent(Intent.ACTION_VIEW,
-                                            Uri.parse("google.navigation:q=" + nearestBusStop.getLat() + "," + nearestBusStop.getLon() + "&mode=w"));
-                                    intent.setPackage("com.google.android.apps.maps");
-                                    if (intent.resolveActivity(getPackageManager()) != null) {
-                                        startActivity(intent);
-
-                                        // Navigasyon başladığında bir mesaj söyle
-                                        if (!speechInputReceived) {
-                                            String navigation = "The nearest bus stop is " + Math.round(distanceToBusStop) + " meters away. Navigation is started, move forward";
-
-                                            textToSpeech.setLanguage(Locale.getDefault());
-                                            textToSpeech.speak(navigation, TextToSpeech.QUEUE_ADD, null, "navigation");
-                                        }
-                                    }
-                                }
-
-
-                                @Override
-                                public void onError(String error) {
-                                    Log.e("FindBusStopError", "Error retrieving bus stops: " + error);
-                                    Toast.makeText(MainActivity.this, "Hata: " + error, Toast.LENGTH_SHORT).show();
-                                }
-
-
-                            });
-                        } else {
-                            Toast.makeText(MainActivity.this, "Hedef konum bulunamadı", Toast.LENGTH_SHORT).show();
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
+            // Overpass API'den rotanın herhangi bir noktasındaki otobüs duraklarını al
+            OverpassApiHelper.getBusStopsInKocaeli(this, new OverpassApiHelper.BusStopsListener() {
+                @Override
+                public void onBusStopsReceived(List<BusStop> busStops) {
+                    if (busStops.isEmpty()) {
+                        Toast.makeText(MainActivity.this, "Yakınlarda otobüs durağı bulunamadı", Toast.LENGTH_SHORT).show();
+                        return;
                     }
-                } else {
-                    Log.e("FindBusStopError", "Last known location is null");
-                    Toast.makeText(MainActivity.this, "Konum bilgisi bulunamadı", Toast.LENGTH_SHORT).show();
+
+                    // Kullanıcının bulunduğu konuma en yakın otobüs durağını bul
+                    BusStop nearestBusStop = null;
+                    float minDistance = Float.MAX_VALUE;
+                    for (BusStop busStop : busStops) {
+                        Location busStopLocation = new Location("");
+                        busStopLocation.setLatitude(busStop.getLat());
+                        busStopLocation.setLongitude(busStop.getLon());
+
+                        // Kullanıcının mevcut konumu ile otobüs durağı arasındaki mesafeyi hesapla
+                        float distance = userLocation.distanceTo(busStopLocation);
+
+                        // Eğer bu mesafe, şu ana kadar en küçük mesafeden daha küçükse, bu otobüs durağını en yakın olarak belirle
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            nearestBusStop = busStop;
+                        }
+                    }
+
+                    if (nearestBusStop != null) {
+                        // En yakın otobüs durağına Google Haritalar ile yürüyerek yönlendir
+                        Uri uri = Uri.parse("google.navigation:q=" + nearestBusStop.getLat() + "," + nearestBusStop.getLon() + "&mode=w");
+
+                        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                        intent.setPackage("com.google.android.apps.maps");
+                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(intent);
+
+
+
+                    } else {
+                        Toast.makeText(MainActivity.this, "Yakınlarda otobüs durağı bulunamadı", Toast.LENGTH_SHORT).show();
+                    }
                 }
-            } else {
-                Log.e("FindBusStopError", "Location manager is null");
-                Toast.makeText(MainActivity.this, "Konum yöneticisi bulunamadı", Toast.LENGTH_SHORT).show();
-            }
+
+
+                @Override
+                public void onError(String error) {
+                    Log.e("FindBusStopError", "Error retrieving bus stops: " + error);
+                    Toast.makeText(MainActivity.this, "Hata: " + error, Toast.LENGTH_SHORT).show();
+                }
+            });
         } else {
             // Konum izinleri iste
             ActivityCompat.requestPermissions(this,
@@ -290,10 +208,6 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     LOCATION_PERMISSION_REQUEST_CODE);
         }
     }
-
-
-
-
 
 
     @Override
@@ -326,11 +240,15 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                         // Konuşma girişini beklemek için dinleme işlemini başlat
                         listenForSpeechInput();
 
+
                     }
+
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
+
+
         } else {
             // Konum izni verilmediyse, izin iste
             ActivityCompat.requestPermissions(this,

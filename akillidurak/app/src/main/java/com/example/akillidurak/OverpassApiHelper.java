@@ -30,10 +30,10 @@ public class OverpassApiHelper {
     }
 
     public static void getBusStopsInKocaeli(Context context, BusStopsListener listener) {
-        double minLat = 40.6165;
-        double minLon = 29.9224;
-        double maxLat = 41.1935;
-        double maxLon = 30.2121;
+        double minLat = 40.5526; // Kocaeli'nin enlem koordinatı - minimum
+        double minLon = 29.9876; // Kocaeli'nin boylam koordinatı - minimum
+        double maxLat = 41.0759; // Kocaeli'nin enlem koordinatı - maksimum
+        double maxLon = 30.7887; // Kocaeli'nin boylam koordinatı - maksimum
 
         String overpassUrl = String.format(
                 "https://overpass-api.de/api/interpreter?data=[out:json];node[\"highway\"=\"bus_stop\"](40.6165,29.9224,41.1935,30.2121);out body;",
@@ -69,4 +69,3 @@ public class OverpassApiHelper {
         });
     }
 }
-

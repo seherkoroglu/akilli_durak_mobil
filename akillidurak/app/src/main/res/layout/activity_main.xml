@@ -3,28 +3,46 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:padding="16dp"
+    android:background="#000000"
     tools:context=".MainActivity">
 
     <!-- Kullanıcıya yönlendirme bilgilerini göstermek için metin alanı -->
-    <EditText
-        android:id="@+id/source"
+<EditText
+android:id="@+id/source"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:layout_marginTop="16dp"
+android:text="Bulunduğunuz Konum: "
+android:padding="10dp"
+android:focusable="true"
+android:focusableInTouchMode="true"
+    android:background="@drawable/amu_bubble_shadow"
+    android:textSize="25sp"
+android:textColor="#FFFF" />
+
+
+<EditText
+android:id="@+id/destination"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:layout_marginTop="16dp"
+android:text="Hedef Konum: "
+android:padding="10dp"
+android:focusable="true"
+android:focusableInTouchMode="true"
+android:background="@drawable/amu_bubble_shadow"
+android:textSize="25sp"
+android:textColor="#FFFF"
+     />
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/animationView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Bulunduğunuz Konum: "
-        android:textStyle="bold" />
-    <EditText
-        android:id="@+id/destination"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Hedef Konum: "
-        android:textStyle="bold" />
+        app:lottie_rawRes="@raw/aa"
+        app:lottie_autoPlay="true"
+        app:lottie_loop="true"/>
 
-
-
-
-
-</LinearLayout>
+    </LinearLayout>
